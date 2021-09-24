@@ -75,7 +75,6 @@
 
     Object.defineProperty(obj, key, {
       get() {
-        console.log(`读取了${obj}的${key}属性`);
         return val;
       },
 
@@ -313,14 +312,19 @@
 
   function compileToFunction(template) {
     // 将模版解析成ast语法树
-    let ast = parserHTML(template); //  生成代码
+    let ast = parserHTML(template);
+    console.log('生成ast:', ast); //  生成代码
 
     let code = generate(ast);
-    console.log('code:', code); // 生成render
+    console.log('生成code:', code); // 生成render
 
     let render = new Function(`with(this){return ${code}}`);
-    console.log('render:', render.toString());
+    console.log('生成render:', render.toString());
     return render;
+  }
+
+  function mountComponent(vm) {
+    vm._render();
   }
 
   function initMixin(Vue) {
@@ -355,6 +359,56 @@
         let render = compileToFunction(template);
         opts.render = render;
       }
+
+      mountComponent(vm);
+    };
+  }
+
+  function createElement(vm, tag, attrs, ...children) {
+    return vnode(vm, tag, attrs, children, attrs.key, undefined);
+  }
+  function createText(vm, text) {
+    return vnode(vm, undefined, undefined, undefined, undefined, text);
+  }
+
+  function vnode(vm, tag, attrs, children, key, text) {
+    return {
+      vm,
+      tag,
+      attrs,
+      children,
+      key,
+      text
+    };
+  }
+
+  function renderMixin(Vue) {
+    Vue.prototype._c = function () {
+      // 创建元素
+      const vm = this;
+      return createElement(vm, ...arguments);
+    };
+
+    Vue.prototype._v = function (text) {
+      // 创建文本
+      const vm = this;
+      return createText(vm, text);
+    };
+
+    Vue.prototype._s = function (val) {
+      // JSON.stringify
+      if (isObject(val)) return JSON.stringify(val);
+      return val;
+    };
+
+    Vue.prototype._render = function () {
+      const vm = this;
+      const {
+        render,
+        el
+      } = vm.$options;
+      const vnode = render.call(vm);
+      console.log('生成vnode:', vnode);
     };
   }
 
@@ -364,6 +418,7 @@
   }
 
   initMixin(Vue);
+  renderMixin(Vue);
   // 2、会将用户的选项放到 vm.$options上
   // 3、会对当前选项上判断有没有data数据
   // 4、有data 判断data是不是一个函数，如果是函数取返回值

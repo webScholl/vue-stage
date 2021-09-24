@@ -1,8 +1,10 @@
 import initMixin from './init'
+import renderMixin from './render'
 function Vue(options) {
   this._init(options) // 实现vue的初始化操作
 }
 initMixin(Vue)
+renderMixin(Vue)
 
 export default Vue
 

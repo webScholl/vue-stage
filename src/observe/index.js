@@ -31,7 +31,6 @@ function defineReactive(obj, key, val) { //这里是闭包
   observe(val) // 递归进行观测数据 不管有多少层都进行defineProperty
   Object.defineProperty(obj, key, {
     get() {
-      console.log(`读取了${obj}的${key}属性`)
       return val
     },
     set(newVal) {
