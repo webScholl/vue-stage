@@ -19,7 +19,7 @@ function gen(child) {
     return generate(child)
   } else {
     let text = child.text
-    if (!defaultTagRE.test(text)) return `_v(${text})`
+    if (!defaultTagRE.test(text)) return `_v('${text}')`
     let lastIndex = defaultTagRE.lastIndex = 0
     let tokens = []
     let match
@@ -46,6 +46,6 @@ function genChildren(ast) {
 }
 export function generate(ast) {
   let children = genChildren(ast)
-  let code = `_c('${ast.tag}',${ast.attrs.length ? genProps(ast.attrs) : ''},${children ? children : ''})`
+  let code = `_c('${ast.tag}',${ast.attrs.length ? genProps(ast.attrs) : undefined},${children ? children : undefined})`
   return code
 }

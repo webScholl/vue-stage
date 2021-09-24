@@ -270,7 +270,7 @@
       return generate(child);
     } else {
       let text = child.text;
-      if (!defaultTagRE.test(text)) return `_v(${text})`;
+      if (!defaultTagRE.test(text)) return `_v('${text}')`;
       let lastIndex = defaultTagRE.lastIndex = 0;
       let tokens = [];
       let match;
@@ -306,7 +306,7 @@
 
   function generate(ast) {
     let children = genChildren(ast);
-    let code = `_c('${ast.tag}',${ast.attrs.length ? genProps(ast.attrs) : ''},${children ? children : ''})`;
+    let code = `_c('${ast.tag}',${ast.attrs.length ? genProps(ast.attrs) : undefined},${children ? children : undefined})`;
     return code;
   }
 
@@ -323,8 +323,39 @@
     return render;
   }
 
+  function updateProperties(el, attrs = {}) {
+    for (const key in attrs) {
+      el.setAttribute(key, attrs[key]);
+    }
+  }
+
+  function patch(vnode) {
+    if (vnode.tag) {
+      vnode.el = document.createElement(vnode.tag);
+      updateProperties(vnode.el, vnode.attrs);
+      vnode.children.forEach(child => {
+        vnode.el.appendChild(patch(child));
+      });
+    } else {
+      vnode.el = document.createTextNode(vnode.text);
+    }
+
+    return vnode.el;
+  }
+
   function mountComponent(vm) {
-    vm._render();
+    const vnode = vm._render();
+
+    vm._update(vnode);
+  }
+  function lifeCycleMixin(Vue) {
+    Vue.prototype._update = function (vnode) {
+      const vm = this;
+      const ele = patch(vnode);
+      console.log('生成真实ele:', ele);
+      vm.$el.parentNode.insertBefore(ele, vm.$el);
+      vm.$el.parentNode.removeChild(vm.$el);
+    };
   }
 
   function initMixin(Vue) {
@@ -364,7 +395,7 @@
     };
   }
 
-  function createElement(vm, tag, attrs, ...children) {
+  function createElement(vm, tag, attrs = {}, ...children) {
     return vnode(vm, tag, attrs, children, attrs.key, undefined);
   }
   function createText(vm, text) {
@@ -403,12 +434,9 @@
 
     Vue.prototype._render = function () {
       const vm = this;
-      const {
-        render,
-        el
-      } = vm.$options;
-      const vnode = render.call(vm);
+      const vnode = vm.$options.render.call(vm);
       console.log('生成vnode:', vnode);
+      return vnode;
     };
   }
 
@@ -419,6 +447,7 @@
 
   initMixin(Vue);
   renderMixin(Vue);
+  lifeCycleMixin(Vue);
   // 2、会将用户的选项放到 vm.$options上
   // 3、会对当前选项上判断有没有data数据
   // 4、有data 判断data是不是一个函数，如果是函数取返回值

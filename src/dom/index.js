@@ -1,4 +1,4 @@
-export function createElement(vm, tag, attrs, ...children) {
+export function createElement(vm, tag, attrs = {}, ...children) {
   return vnode(vm, tag, attrs, children, attrs.key, undefined)
 }
 export function createText(vm, text) {

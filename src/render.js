@@ -16,9 +16,10 @@ function renderMixin(Vue) {
   }
   Vue.prototype._render = function () {
     const vm = this
-    const { render, el } = vm.$options
-    const vnode = render.call(vm)
+    const vnode = vm.$options.render.call(vm)
     console.log('生成vnode:', vnode)
+
+    return vnode
   }
 }
 export default renderMixin
