@@ -1,5 +1,6 @@
 import { isObject } from '../utils'
 import arrayMethods from './array'
+import Dep from './dep'
 class Observer {
   constructor(data) {
     // data.__ob__ = this 
@@ -29,13 +30,16 @@ class Observer {
 // vue2应用了defineProperty需要一加载都时候，就进行递归操作，所以耗性能，如果层次过深也会浪费性能
 function defineReactive(obj, key, val) { //这里是闭包
   observe(val) // 递归进行观测数据 不管有多少层都进行defineProperty
+  const dep = new Dep()
   Object.defineProperty(obj, key, {
     get() {
+      Dep.target.addDep(dep)
       return val
     },
     set(newVal) {
       observe(newVal)
       val = newVal
+      dep.notice()
     },
   })
 }
@@ -43,6 +47,5 @@ function observe(data) {
   if (!isObject(data)) return
   if (data.__ob__) return
   new Observer(data)
-
 }
 export default observe

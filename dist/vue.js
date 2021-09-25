@@ -36,6 +36,28 @@
     };
   });
 
+  let id = 0;
+
+  class Dep {
+    constructor() {
+      this.id = id++;
+      this.watchs = [];
+    }
+
+    addWatcher(watcher) {
+      this.watchs.push(watcher);
+    }
+
+    notice() {
+      this.watchs.forEach(watch => {
+        watch.get();
+      });
+    }
+
+  }
+
+  Dep.target = null;
+
   class Observer {
     constructor(data) {
       // data.__ob__ = this 
@@ -73,14 +95,17 @@
     //这里是闭包
     observe(val); // 递归进行观测数据 不管有多少层都进行defineProperty
 
+    const dep = new Dep();
     Object.defineProperty(obj, key, {
       get() {
+        Dep.target.addDep(dep);
         return val;
       },
 
       set(newVal) {
         observe(newVal);
         val = newVal;
+        dep.notice();
       }
 
     });
@@ -343,18 +368,49 @@
     return vnode.el;
   }
 
-  function mountComponent(vm) {
-    const vnode = vm._render();
+  class Watcher {
+    constructor(vm) {
+      this.vm = vm;
+      this.deps = [];
+      this.depIds = new Set();
+      this.get(vm);
+    }
 
-    vm._update(vnode);
+    get() {
+      Dep.target = this;
+      this.geter();
+      Dep.target = null;
+    }
+
+    geter() {
+      const vnode = this.vm._render();
+
+      this.vm._update(vnode);
+    }
+
+    addDep(dep) {
+      const depId = dep.id;
+
+      if (!this.depIds.has(depId)) {
+        this.depIds.add(depId);
+        this.deps.push(dep);
+        dep.addWatcher(this);
+      }
+    }
+
+  }
+
+  function mountComponent(vm) {
+    new Watcher(vm);
   }
   function lifeCycleMixin(Vue) {
     Vue.prototype._update = function (vnode) {
       const vm = this;
       const ele = patch(vnode);
       console.log('生成真实ele:', ele);
-      vm.$el.parentNode.insertBefore(ele, vm.$el);
+      vm.$el.parentNode.insertBefore(ele, vm.$el.nextSibling);
       vm.$el.parentNode.removeChild(vm.$el);
+      vm.$el = ele;
     };
   }
 
