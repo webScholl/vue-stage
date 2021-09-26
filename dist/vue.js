@@ -10,6 +10,23 @@
   function isObject(val) {
     return typeof val === 'object' && val !== null;
   }
+  let callbacks = [];
+  let pedding$1 = false;
+
+  function flush() {
+    callbacks.forEach(fn => fn());
+    callbacks = [];
+    pedding$1 = false;
+  }
+
+  function nextTick(fn) {
+    callbacks.push(fn);
+
+    if (!pedding$1) {
+      Promise.resolve().then(flush);
+      pedding$1 = true;
+    }
+  }
 
   const oldArrayPrototype = Array.prototype;
   const arrayMethods = Object.create(oldArrayPrototype); // 让arrayMethods通过__proto__找到数组的原型方法
@@ -36,21 +53,29 @@
     };
   });
 
-  let id = 0;
+  let id$1 = 0;
 
   class Dep {
     constructor() {
-      this.id = id++;
-      this.watchs = [];
+      this.id = id$1++;
+      this.watchers = [];
+      this.watcherId = new Set();
     }
 
     addWatcher(watcher) {
-      this.watchs.push(watcher);
+      const watcherId = watcher.id;
+
+      if (!this.watcherId.has(watcherId)) {
+        this.watcherId.add(watcherId);
+        this.watchers.push(watcher); // 同时把当前到Watcher里存放dep 当前还没有用到
+
+        watcher.addDep(this);
+      }
     }
 
     notice() {
-      this.watchs.forEach(watch => {
-        watch.get();
+      this.watchers.forEach(watch => {
+        watch.update();
       });
     }
 
@@ -98,7 +123,8 @@
     const dep = new Dep();
     Object.defineProperty(obj, key, {
       get() {
-        Dep.target.addDep(dep);
+        dep.addWatcher(Dep.target); // 每次渲染的时候把当前watch存放到当前属性到Watchers里面，等待修改属性值之后触发存放在Watchers到Watcher，实现渲染
+
         return val;
       },
 
@@ -368,40 +394,80 @@
     return vnode.el;
   }
 
+  let watcherIds = new Set();
+  let queue = [];
+  let pedding = false;
+
+  function flushSchedulerQueue() {
+    queue.forEach(watcher => {
+      watcher.get(); // 触发渲染
+
+      watcherIds = new Set();
+      queue = [];
+      pedding = false;
+    });
+  }
+
+  function queueWatcher(watcher) {
+    const watcherId = watcher.id;
+
+    if (!watcherIds.has(watcherId)) {
+      watcherIds.add(watcherId);
+      queue.push(watcher);
+
+      if (!pedding) {
+        pedding = true; //锁
+
+        nextTick(flushSchedulerQueue); // 异步更新
+      }
+    }
+  }
+
+  let id = 0;
+
   class Watcher {
-    constructor(vm) {
+    constructor(vm, updateComponentFn, cb) {
+      this.id = id++;
       this.vm = vm;
+      this.updateComponentFn = updateComponentFn; // 渲染函数
+
+      this.cb = cb;
       this.deps = [];
-      this.depIds = new Set();
-      this.get(vm);
+      this.get(vm); // 上来就做一次初始渲染
     }
 
     get() {
-      Dep.target = this;
+      Dep.target = this; // 保存当前Watcher到全局
+
       this.geter();
-      Dep.target = null;
+      Dep.target = null; // 渲染完成后清空全局的Watcher
     }
 
     geter() {
-      const vnode = this.vm._render();
-
-      this.vm._update(vnode);
+      this.updateComponentFn();
     }
 
     addDep(dep) {
-      const depId = dep.id;
+      this.deps.push(dep);
+    }
 
-      if (!this.depIds.has(depId)) {
-        this.depIds.add(depId);
-        this.deps.push(dep);
-        dep.addWatcher(this);
-      }
+    update() {
+      // dep.notice触发该方法  将更新的watcher先存起来再依次触发渲染
+      queueWatcher(this);
     }
 
   }
 
   function mountComponent(vm) {
-    new Watcher(vm);
+    const updateComponentFn = () => {
+      const vnode = vm._render();
+
+      vm._update(vnode);
+    };
+
+    new Watcher(vm, updateComponentFn, () => {
+      console.log('组件挂载完毕');
+    });
   }
   function lifeCycleMixin(Vue) {
     Vue.prototype._update = function (vnode) {
@@ -449,6 +515,8 @@
 
       mountComponent(vm);
     };
+
+    Vue.prototype.$nextTick = nextTick;
   }
 
   function createElement(vm, tag, attrs = {}, ...children) {

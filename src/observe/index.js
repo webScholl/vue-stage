@@ -33,7 +33,7 @@ function defineReactive(obj, key, val) { //这里是闭包
   const dep = new Dep()
   Object.defineProperty(obj, key, {
     get() {
-      Dep.target.addDep(dep)
+      dep.addWatcher(Dep.target) // 每次渲染的时候把当前watch存放到当前属性到Watchers里面，等待修改属性值之后触发存放在Watchers到Watcher，实现渲染
       return val
     },
     set(newVal) {
