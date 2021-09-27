@@ -14,7 +14,7 @@ class Dep {
       watcher.addDep(this)
     }
   }
-  notice() {
+  notify() {
     this.watchers.forEach(watch => {
       watch.update()
     })

@@ -15,6 +15,7 @@ methods.forEach(method => {
         break
     }
     if (inserted) ob.observeArray(inserted)
+    ob.dep.notify()
   }
 })
 

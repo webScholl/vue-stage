@@ -13,7 +13,7 @@
   let callbacks = [];
   let pedding$1 = false;
 
-  function flush() {
+  function flushCallbacks() {
     callbacks.forEach(fn => fn());
     callbacks = [];
     pedding$1 = false;
@@ -23,7 +23,7 @@
     callbacks.push(fn);
 
     if (!pedding$1) {
-      Promise.resolve().then(flush);
+      Promise.resolve().then(flushCallbacks);
       pedding$1 = true;
     }
   }
@@ -50,6 +50,7 @@
       }
 
       if (inserted) ob.observeArray(inserted);
+      ob.dep.notify();
     };
   });
 
@@ -73,7 +74,7 @@
       }
     }
 
-    notice() {
+    notify() {
       this.watchers.forEach(watch => {
         watch.update();
       });
@@ -86,6 +87,7 @@
   class Observer {
     constructor(data) {
       // data.__ob__ = this 
+      this.dep = new Dep();
       Object.defineProperty(data, '__ob__', {
         // 给对象和数组添加一个自定义属性__ob__
         value: this,
@@ -113,17 +115,38 @@
       });
     }
 
+  }
+
+  function addWatcher(val) {
+    val.forEach(e => {
+      e.__ob__ && e.__ob__.dep.addWatcher(Dep.target); // 如果是对象就添加Watcher
+
+      if (Array.isArray(e)) {
+        addWatcher(e);
+      }
+    });
   } // vue2应用了defineProperty需要一加载都时候，就进行递归操作，所以耗性能，如果层次过深也会浪费性能
 
 
   function defineReactive(obj, key, val) {
     //这里是闭包
-    observe(val); // 递归进行观测数据 不管有多少层都进行defineProperty
+    let childOb = observe(val); // 递归进行观测数据 不管有多少层都进行defineProperty
 
     const dep = new Dep();
     Object.defineProperty(obj, key, {
       get() {
-        dep.addWatcher(Dep.target); // 每次渲染的时候把当前watch存放到当前属性到Watchers里面，等待修改属性值之后触发存放在Watchers到Watcher，实现渲染
+        if (Dep.target) {
+          dep.addWatcher(Dep.target); // 每次渲染的时候把当前watch存放到当前属性到Watchers里面，等待修改属性值之后触发存放在Watchers到Watcher，实现渲染
+
+          if (childOb) {
+            childOb.dep.addWatcher(Dep.target);
+
+            if (Array.isArray(val)) {
+              // 对val的每个子元素对象 添加watcher
+              addWatcher(val);
+            }
+          }
+        }
 
         return val;
       },
@@ -131,7 +154,7 @@
       set(newVal) {
         observe(newVal);
         val = newVal;
-        dep.notice();
+        dep.notify();
       }
 
     });
@@ -140,7 +163,7 @@
   function observe(data) {
     if (!isObject(data)) return;
     if (data.__ob__) return;
-    new Observer(data);
+    return new Observer(data);
   }
 
   function initState(vm) {
