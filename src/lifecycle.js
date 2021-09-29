@@ -21,3 +21,8 @@ export function lifeCycleMixin(Vue) {
     vm.$el = ele
   }
 }
+
+export function callHook(vm, hook) {
+  const handlers = vm.$options[hook]
+  handlers && handlers.forEach(handler => handler.call(vm))
+}

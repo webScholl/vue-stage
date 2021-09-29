@@ -25,6 +25,14 @@
       }
     }
   })
+  Vue.mixin({
+    created: () => { },
+    data: () => { console.log(1) }
+  })
+  Vue.mixin({
+    created: () => { },
+    data: () => { console.log(2) }
+  })
 </script>
 
 

@@ -1,12 +1,14 @@
 import initMixin from './init'
 import renderMixin from './render'
 import { lifeCycleMixin } from './lifecycle'
+import { initGlobalAPI } from './global-api'
 function Vue(options) {
   this._init(options) // 实现vue的初始化操作
 }
 initMixin(Vue)
 renderMixin(Vue)
 lifeCycleMixin(Vue)
+initGlobalAPI(Vue)
 
 export default Vue
 

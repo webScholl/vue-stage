@@ -27,6 +27,43 @@
       pedding$1 = true;
     }
   }
+  let strats = {}; // 存放
+
+  let lifeCycle = ['beforecreate', 'created', 'beforeMount', 'mounted'];
+  lifeCycle.forEach(hook => {
+    strats[hook] = function (parentVal, childVal) {
+      if (childVal) {
+        if (parentVal) {
+          return parentVal.concat(childVal);
+        } else {
+          return Array.isArray(childVal) ? childVal : [childVal];
+        }
+      } else {
+        return parentVal;
+      }
+    };
+  });
+  function mergeOptions(parentVal, childVal) {
+    const options = {};
+
+    for (const key in parentVal) {
+      mergeFiled(key);
+    }
+
+    for (const key in childVal) {
+      mergeFiled(key);
+    }
+
+    function mergeFiled(key) {
+      if (strats[key]) {
+        options[key] = strats[key](parentVal[key], childVal[key]);
+      } else {
+        options[key] = childVal[key] || parentVal[key];
+      }
+    }
+
+    return options;
+  }
 
   const oldArrayPrototype = Array.prototype;
   const arrayMethods = Object.create(oldArrayPrototype); // 让arrayMethods通过__proto__找到数组的原型方法
@@ -506,7 +543,8 @@
   function initMixin(Vue) {
     Vue.prototype._init = function (options) {
       const vm = this;
-      vm.$options = options;
+      vm.$options = mergeOptions(vm.constructor.options, options);
+      console.log(vm.$options);
       initState(vm);
 
       if (vm.$options.el) {
@@ -587,6 +625,21 @@
     };
   }
 
+  function initGlobalAPI(Vue) {
+    Vue.options = {}; // 全局属性，在每个组件初始化的时候将这些属性放到每个组件上
+
+    Vue.mixin = function (options) {
+      this.options = mergeOptions(this.options, options);
+      return this;
+    };
+
+    Vue.component = function () {};
+
+    Vue.filter = function () {};
+
+    Vue.directive = function () {};
+  }
+
   function Vue(options) {
     this._init(options); // 实现vue的初始化操作
 
@@ -595,6 +648,7 @@
   initMixin(Vue);
   renderMixin(Vue);
   lifeCycleMixin(Vue);
+  initGlobalAPI(Vue);
   // 2、会将用户的选项放到 vm.$options上
   // 3、会对当前选项上判断有没有data数据
   // 4、有data 判断data是不是一个函数，如果是函数取返回值
