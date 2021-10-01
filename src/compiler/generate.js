@@ -3,7 +3,7 @@ function genProps(attrs) {
   let str = ''
   for (let i = 0; i < attrs.length; i++) {
     const attr = attrs[i]
-    if (attr === 'style') {
+    if (attr.name === 'style') {
       const styles = {}
       attr.value.replace(/([^;:]+):([^;:]+)/g, function () {
         styles[arguments[1]] = arguments[2]

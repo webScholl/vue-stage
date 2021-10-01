@@ -6,7 +6,6 @@ function initMixin(Vue) {
   Vue.prototype._init = function (options) {
     const vm = this
     vm.$options = mergeOptions(vm.constructor.options, options)
-    console.log(vm.$options)
     initState(vm)
 
     if (vm.$options.el) {

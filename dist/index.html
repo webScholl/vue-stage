@@ -9,30 +9,19 @@
 </head>
 
 <body>
-  <div id="app">
-    <span>{{o}}</span>
-  </div>
+  <!-- <div id="app">
+    <span>{{name}}</span>
+  </div> -->
 </body>
 <script src='./vue.js'></script>
 <script>
-  const vm = new Vue({
-    el: '#app',
-    data() {
-      return {
-        name: 'zf',
-        age: 18,
-        o: { a: 1 }
-      }
-    }
-  })
-  Vue.mixin({
-    created: () => { },
-    data: () => { console.log(1) }
-  })
-  Vue.mixin({
-    created: () => { },
-    data: () => { console.log(2) }
-  })
+  // const vm = new Vue({
+  //   data() {
+  //     return {
+  //       name: 'zf',
+  //     }
+  //   }
+  // })
 </script>
 
 

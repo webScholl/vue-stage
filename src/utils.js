@@ -51,3 +51,6 @@ export function mergeOptions(parentVal, childVal) {
   }
   return options
 }
+export function isSameNode(oldVnode, newVnode) {
+  return oldVnode.tag === newVnode.tag && oldVnode.key === newVnode.key
+}

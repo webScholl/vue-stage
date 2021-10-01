@@ -64,6 +64,9 @@
 
     return options;
   }
+  function isSameNode(oldVnode, newVnode) {
+    return oldVnode.tag === newVnode.tag && oldVnode.key === newVnode.key;
+  }
 
   const oldArrayPrototype = Array.prototype;
   const arrayMethods = Object.create(oldArrayPrototype); // 让arrayMethods通过__proto__找到数组的原型方法
@@ -362,7 +365,7 @@
     for (let i = 0; i < attrs.length; i++) {
       const attr = attrs[i];
 
-      if (attr === 'style') {
+      if (attr.name === 'style') {
         const styles = {};
         attr.value.replace(/([^;:]+):([^;:]+)/g, function () {
           styles[arguments[1]] = arguments[2];
@@ -434,24 +437,70 @@
     return render;
   }
 
-  function updateProperties(el, attrs = {}) {
-    for (const key in attrs) {
-      el.setAttribute(key, attrs[key]);
+  function updateProperties(vnode, oldAttrs = {}) {
+    for (const key in vnode.attrs) {
+      if (key === 'style') {
+        for (const k in vnode.attrs[key]) {
+          vnode.el.style[k] = vnode.attrs[key][k];
+        }
+      } else {
+        vnode.el.setAttribute(key, vnode.attrs[key]);
+      }
+    }
+
+    for (const key in oldAttrs) {
+      if (key === 'style') {
+        for (const k in oldAttrs[key]) {
+          if (!vnode.el.style[k]) {
+            vnode.el.style[k] = '';
+          }
+        }
+      } else {
+        if (!vnode.attrs[key]) {
+          vnode.el.removeAttribute(oldAttrs[key]);
+        }
+      }
     }
   }
 
-  function patch(vnode) {
+  function createElem(vnode) {
     if (vnode.tag) {
       vnode.el = document.createElement(vnode.tag);
-      updateProperties(vnode.el, vnode.attrs);
+      updateProperties(vnode);
       vnode.children.forEach(child => {
-        vnode.el.appendChild(patch(child));
+        vnode.el.appendChild(createElem(child));
       });
     } else {
       vnode.el = document.createTextNode(vnode.text);
     }
 
     return vnode.el;
+  }
+  function patch(oldVnode, newVnode) {
+    if (oldVnode.nodeType) {
+      const elm = createElem(newVnode);
+      const parentNode = oldVnode.parentNode;
+      parentNode.insertBefore(elm, oldVnode.nextSibling);
+      parentNode.removeChild(oldVnode);
+    } else {
+      if (!isSameNode(oldVnode, newVnode)) {
+        oldVnode.el.parentNode.replaceChild(createElem(newVnode), oldVnode.el);
+        return;
+      }
+
+      const _elm = newVnode.el = oldVnode.el; // 复用节点
+
+
+      if (!oldVnode.tag) {
+        if (oldVnode.text !== newVnode.text) {
+          _elm.textContent = newVnode.text;
+        }
+      }
+
+      if (isSameNode(oldVnode, newVnode)) {
+        updateProperties(newVnode, oldVnode.attrs);
+      }
+    }
   }
 
   let watcherIds = new Set();
@@ -532,11 +581,7 @@
   function lifeCycleMixin(Vue) {
     Vue.prototype._update = function (vnode) {
       const vm = this;
-      const ele = patch(vnode);
-      console.log('生成真实ele:', ele);
-      vm.$el.parentNode.insertBefore(ele, vm.$el.nextSibling);
-      vm.$el.parentNode.removeChild(vm.$el);
-      vm.$el = ele;
+      patch(vm.$el, vnode);
     };
   }
 
@@ -544,7 +589,6 @@
     Vue.prototype._init = function (options) {
       const vm = this;
       vm.$options = mergeOptions(vm.constructor.options, options);
-      console.log(vm.$options);
       initState(vm);
 
       if (vm.$options.el) {
@@ -649,6 +693,29 @@
   renderMixin(Vue);
   lifeCycleMixin(Vue);
   initGlobalAPI(Vue);
+  const vm1 = new Vue({
+    data() {
+      return {
+        name: 'zf'
+      };
+    }
+
+  });
+  const vm2 = new Vue({
+    data() {
+      return {
+        name: 'jj'
+      };
+    }
+
+  });
+  const oldVnode = compileToFunction('<div style="color:red;font-size:30px;">{{name}}</div>').call(vm1);
+  const elm1 = createElem(oldVnode);
+  document.body.appendChild(elm1);
+  const newVnode = compileToFunction('<p class="root" style="color:green;font-size:15px;">{{name}}</p>').call(vm2);
+  setTimeout(() => {
+    patch(oldVnode, newVnode); // 对比新老虚拟节点
+  }, 3000);
   // 2、会将用户的选项放到 vm.$options上
   // 3、会对当前选项上判断有没有data数据
   // 4、有data 判断data是不是一个函数，如果是函数取返回值
