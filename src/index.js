@@ -2,8 +2,6 @@ import initMixin from './init'
 import renderMixin from './render'
 import { lifeCycleMixin } from './lifecycle'
 import { initGlobalAPI } from './global-api'
-import { compileToFunction } from './compiler'
-import { createElem, patch } from './dom/patch'
 function Vue(options) {
   this._init(options) // 实现vue的初始化操作
 }
@@ -11,31 +9,6 @@ initMixin(Vue)
 renderMixin(Vue)
 lifeCycleMixin(Vue)
 initGlobalAPI(Vue)
-
-const vm1 = new Vue({
-  data() {
-    return {
-      name: 'zf'
-    }
-  }
-})
-const vm2 = new Vue({
-  data() {
-    return {
-      name: 'jj'
-    }
-  }
-})
-
-const oldVnode = compileToFunction('<div style="color:red;font-size:30px;">{{name}}</div>').call(vm1)
-const elm1 = createElem(oldVnode)
-document.body.appendChild(elm1)
-
-const newVnode = compileToFunction('<p class="root" style="color:green;font-size:15px;">{{name}}</p>').call(vm2)
-
-setTimeout(() => {
-  patch(oldVnode, newVnode) // 对比新老虚拟节点
-}, 3000);
 
 export default Vue
 

@@ -34,6 +34,13 @@ lifeCycle.forEach(hook => {
     }
   }
 })
+strats.components = function (parentVal, childVal) {
+  const res = Object.create(parentVal)
+  for (const key in childVal) {
+    res[key] = childVal[key]
+  }
+  return res
+}
 export function mergeOptions(parentVal, childVal) {
   const options = {}
   for (const key in parentVal) {
@@ -51,6 +58,14 @@ export function mergeOptions(parentVal, childVal) {
   }
   return options
 }
-export function isSameNode(oldVnode, newVnode) {
+export function isSameVnode(oldVnode, newVnode) {
   return oldVnode.tag === newVnode.tag && oldVnode.key === newVnode.key
 }
+
+function makeMap(str) {
+  const map = {}
+  const list = str.split(',')
+  list.forEach(ele => { map[ele] = true })
+  return (ele) => map[ele]
+}
+export const isReservedTag = makeMap('a,div,img,image,text,span,input,p,button')

@@ -9,19 +9,34 @@
 </head>
 
 <body>
-  <!-- <div id="app">
+  <div id="app">
     <span>{{name}}</span>
-  </div> -->
+    <my_button></my_button>
+  </div>
 </body>
 <script src='./vue.js'></script>
 <script>
-  // const vm = new Vue({
-  //   data() {
-  //     return {
-  //       name: 'zf',
-  //     }
-  //   }
-  // })
+  Vue.component('my_button', {
+    template: '<button>全局按钮</button>'
+  })
+  const vm = new Vue({
+    el: '#app',
+    data() {
+      return {
+        name: '珠峰',
+      }
+    },
+    components: {
+      'my_button': {
+        template: '<button style="background:red;">局部按钮<xx></xx></button>',
+        components: {
+          'xx': {
+            template: '<button style="background:green;">局部按钮的局部按钮</button>'
+          }
+        }
+      }
+    }
+  })
 </script>
 
 

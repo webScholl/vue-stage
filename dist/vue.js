@@ -43,6 +43,17 @@
       }
     };
   });
+
+  strats.components = function (parentVal, childVal) {
+    const res = Object.create(parentVal);
+
+    for (const key in childVal) {
+      res[key] = childVal[key];
+    }
+
+    return res;
+  };
+
   function mergeOptions(parentVal, childVal) {
     const options = {};
 
@@ -64,9 +75,20 @@
 
     return options;
   }
-  function isSameNode(oldVnode, newVnode) {
+  function isSameVnode(oldVnode, newVnode) {
     return oldVnode.tag === newVnode.tag && oldVnode.key === newVnode.key;
   }
+
+  function makeMap(str) {
+    const map = {};
+    const list = str.split(',');
+    list.forEach(ele => {
+      map[ele] = true;
+    });
+    return ele => map[ele];
+  }
+
+  const isReservedTag = makeMap('a,div,img,image,text,span,input,p,button');
 
   const oldArrayPrototype = Array.prototype;
   const arrayMethods = Object.create(oldArrayPrototype); // 让arrayMethods通过__proto__找到数组的原型方法
@@ -437,6 +459,38 @@
     return render;
   }
 
+  function updateChildren(parent, oldChildren, newChildren) {
+    let oldStartIndex = 0;
+    let oldStartVnode = oldChildren[0];
+    let oldEndIndex = oldChildren.length - 1;
+    let oldEndVnode = oldChildren[oldEndIndex];
+    let newStartIndex = 0;
+    let newStartVnode = newChildren[0];
+    let newEndIndex = newChildren.length - 1;
+    let newEndVnode = newChildren[newEndIndex];
+
+    while (oldStartIndex <= oldEndIndex && newStartIndex <= newEndIndex) {
+      // 优化向后追加逻辑
+      if (isSameVnode(oldStartVnode, newStartVnode)) {
+        patch(oldStartVnode, newStartVnode);
+        oldStartVnode = oldChildren[++oldStartIndex];
+        newStartVnode = newChildren[++newStartIndex]; // 优化向前追加逻辑
+      } else if (isSameVnode(oldEndVnode, newEndVnode)) {
+        patch(oldEndVnode, newEndVnode); // 比较孩子 
+
+        oldEndVnode = oldChildren[--oldEndIndex];
+        newEndVnode = newChildren[--newEndIndex];
+      }
+    }
+
+    if (newStartIndex <= newEndIndex) {
+      for (let i = newStartIndex; i <= newEndIndex; i++) {
+        let ele = newChildren[newEndIndex + 1] == null ? null : newChildren[newEndIndex + 1].el;
+        parent.insertBefore(createElm(newChildren[i]), ele);
+      }
+    }
+  }
+
   function updateProperties(vnode, oldAttrs = {}) {
     for (const key in vnode.attrs) {
       if (key === 'style') {
@@ -463,12 +517,28 @@
     }
   }
 
-  function createElem(vnode) {
+  function createComponent$1(vnode) {
+    let i = vnode.attrs;
+
+    if ((i = i.hook) && (i = i.init)) {
+      i(vnode);
+    }
+
+    if (vnode.componentInstance) {
+      return true;
+    }
+  }
+
+  function createElm(vnode) {
     if (vnode.tag) {
+      if (createComponent$1(vnode)) {
+        return vnode.componentInstance.$el;
+      }
+
       vnode.el = document.createElement(vnode.tag);
       updateProperties(vnode);
       vnode.children.forEach(child => {
-        vnode.el.appendChild(createElem(child));
+        vnode.el.appendChild(createElm(child));
       });
     } else {
       vnode.el = document.createTextNode(vnode.text);
@@ -477,15 +547,22 @@
     return vnode.el;
   }
   function patch(oldVnode, newVnode) {
+    if (!oldVnode) {
+      // 组件的挂载
+      return createElm(newVnode);
+    }
+
     if (oldVnode.nodeType) {
-      const elm = createElem(newVnode);
+      const elm = createElm(newVnode);
       const parentNode = oldVnode.parentNode;
       parentNode.insertBefore(elm, oldVnode.nextSibling);
       parentNode.removeChild(oldVnode);
+      return elm;
     } else {
-      if (!isSameNode(oldVnode, newVnode)) {
-        oldVnode.el.parentNode.replaceChild(createElem(newVnode), oldVnode.el);
-        return;
+      if (!isSameVnode(oldVnode, newVnode)) {
+        const elm = createElm(newVnode);
+        oldVnode.el.parentNode.replaceChild(elm, oldVnode.el);
+        return elm;
       }
 
       const _elm = newVnode.el = oldVnode.el; // 复用节点
@@ -497,9 +574,27 @@
         }
       }
 
-      if (isSameNode(oldVnode, newVnode)) {
+      if (isSameVnode(oldVnode, newVnode)) {
         updateProperties(newVnode, oldVnode.attrs);
+      } // 比较孩子节点
+
+
+      let oldChildren = oldVnode.children || [];
+      let newChildren = newVnode.children || []; // 新老都有需要比对儿子
+
+      if (oldChildren.length > 0 && newChildren.length > 0) {
+        updateChildren(_elm, oldChildren, newChildren); // 老的有儿子新的没有清空即可
+      } else if (oldChildren.length > 0) {
+        _elm.innerHTML = ''; // 新的有儿子
+      } else if (newChildren.length > 0) {
+        for (let i = 0; i < newChildren.length; i++) {
+          let child = newChildren[i];
+
+          _elm.appendChild(createElm(child));
+        }
       }
+
+      return _elm;
     }
   }
 
@@ -581,7 +676,16 @@
   function lifeCycleMixin(Vue) {
     Vue.prototype._update = function (vnode) {
       const vm = this;
-      patch(vm.$el, vnode);
+      const prevVnode = vm._vnode;
+      vm._vnode = vnode;
+
+      if (!prevVnode) {
+        // 挂载
+        vm.$el = patch(vm.$el, vnode);
+      } else {
+        //更新时做diff操作
+        vm.$el = patch(prevVnode, vnode);
+      }
     };
   }
 
@@ -624,21 +728,45 @@
     Vue.prototype.$nextTick = nextTick;
   }
 
+  function createComponent(vm, tag, attrs, children, key, text, Ctor) {
+    if (isObject(Ctor)) {
+      Ctor = vm.$options._base.extend(Ctor);
+    }
+
+    attrs.hook = {
+      init(vnode) {
+        vnode.componentInstance = new Ctor(); // 初始化组件
+
+        vnode.componentInstance.$mount(); // 挂载组件
+      }
+
+    };
+    return vnode(vm, `vc-${tag}`, attrs, children, key, text, {
+      Ctor
+    });
+  }
+
   function createElement(vm, tag, attrs = {}, ...children) {
-    return vnode(vm, tag, attrs, children, attrs.key, undefined);
+    if (!isReservedTag(tag)) {
+      const Ctor = vm.$options.components[tag];
+      return createComponent(vm, tag, attrs, undefined, attrs.key, undefined, Ctor);
+    } else {
+      return vnode(vm, tag, attrs, children, attrs.key, undefined);
+    }
   }
   function createText(vm, text) {
     return vnode(vm, undefined, undefined, undefined, undefined, text);
   }
 
-  function vnode(vm, tag, attrs, children, key, text) {
+  function vnode(vm, tag, attrs, children, key, text, componentOptions) {
     return {
       vm,
       tag,
       attrs,
       children,
       key,
-      text
+      text,
+      componentOptions
     };
   }
 
@@ -672,12 +800,31 @@
   function initGlobalAPI(Vue) {
     Vue.options = {}; // 全局属性，在每个组件初始化的时候将这些属性放到每个组件上
 
+    Vue.options.components = {};
+    Vue.options._base = Vue;
+
     Vue.mixin = function (options) {
       this.options = mergeOptions(this.options, options);
       return this;
     };
 
-    Vue.component = function () {};
+    Vue.extend = function (definition) {
+      const Super = this;
+
+      function Sub() {
+        this._init(definition);
+      }
+
+      Sub.prototype = Object.create(Super.prototype);
+      Sub.prototype.construcor = Sub;
+      return Sub;
+    };
+
+    Vue.component = function (id, definition) {
+      const name = definition.name || id; // 调用Vue.extend 创建一个子类 来继承于 Vue 返回这个类
+
+      this.options.components[name] = Vue.extend(definition);
+    };
 
     Vue.filter = function () {};
 
@@ -693,29 +840,6 @@
   renderMixin(Vue);
   lifeCycleMixin(Vue);
   initGlobalAPI(Vue);
-  const vm1 = new Vue({
-    data() {
-      return {
-        name: 'zf'
-      };
-    }
-
-  });
-  const vm2 = new Vue({
-    data() {
-      return {
-        name: 'jj'
-      };
-    }
-
-  });
-  const oldVnode = compileToFunction('<div style="color:red;font-size:30px;">{{name}}</div>').call(vm1);
-  const elm1 = createElem(oldVnode);
-  document.body.appendChild(elm1);
-  const newVnode = compileToFunction('<p class="root" style="color:green;font-size:15px;">{{name}}</p>').call(vm2);
-  setTimeout(() => {
-    patch(oldVnode, newVnode); // 对比新老虚拟节点
-  }, 3000);
   // 2、会将用户的选项放到 vm.$options上
   // 3、会对当前选项上判断有没有data数据
   // 4、有data 判断data是不是一个函数，如果是函数取返回值
