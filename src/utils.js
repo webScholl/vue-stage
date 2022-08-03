@@ -22,38 +22,38 @@ export function nextTick(fn) {
 let strats = {} // 存放
 let lifeCycle = ['beforecreate', 'created', 'beforeMount', 'mounted']
 lifeCycle.forEach(hook => {
-  strats[hook] = function (parentVal, childVal) {
-    if (childVal) {
-      if (parentVal) {
-        return parentVal.concat(childVal)
+  strats[hook] = function (parentOptionVal, childOptionVal) {
+    if (childOptionVal) {
+      if (parentOptionVal) {
+        return parentOptionVal.concat(childOptionVal)
       } else {
-        return Array.isArray(childVal) ? childVal : [childVal]
+        return Array.isArray(childOptionVal) ? childOptionVal : [childOptionVal]
       }
     } else {
-      return parentVal
+      return parentOptionVal
     }
   }
 })
-strats.components = function (parentVal, childVal) {
-  const res = Object.create(parentVal)
-  for (const key in childVal) {
-    res[key] = childVal[key]
+strats.components = function (parentOptionVal, childOptionVal) {
+  const res = Object.create(parentOptionVal)
+  for (const key in childOptionVal) {
+    res[key] = childOptionVal[key]
   }
   return res
 }
-export function mergeOptions(parentVal, childVal) {
+export function mergeOptions(parentOptions, childOptions) {
   const options = {}
-  for (const key in parentVal) {
+  for (const key in parentOptions) {
     mergeFiled(key)
   }
-  for (const key in childVal) {
+  for (const key in childOptions) {
     mergeFiled(key)
   }
   function mergeFiled(key) {
     if (strats[key]) {
-      options[key] = strats[key](parentVal[key], childVal[key])
+      options[key] = strats[key](parentOptions[key], childOptions[key])
     } else {
-      options[key] = childVal[key] || parentVal[key]
+      options[key] = childOptions[key] || parentOptions[key]
     }
   }
   return options
